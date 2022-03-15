@@ -11,12 +11,12 @@ import (
 )
 
 type functionObject struct {
+	Comment  string   `json:"comment"`
 	Name     string   `json:"name"`
 	Args     []string `json:"args"`
 	Rest     string   `json:"rest"`
 	Query    string   `json:"query"`
 	Contents []string `json:"contents"`
-	Comment  string   `json:"comment"`
 }
 
 const (
@@ -65,11 +65,20 @@ func lineType(line string) int {
 }
 
 func isRestful(line string) bool {
-	if strings.Contains(line, "get") {
+	if strings.Contains(line, "get") ||
+		strings.Contains(line, "update") {
 		return true
 	}
 
 	return false
+}
+
+func handlerStubGen(funcs []*functionObject, out string) {
+
+}
+
+func repoStubGen(funcs []*functionObject, out string) {
+
 }
 
 func parseFile(file fs.FileInfo) []*functionObject {
@@ -86,21 +95,23 @@ func parseFile(file fs.FileInfo) []*functionObject {
 	defer f.Close()
 
 	var functions []*functionObject
-	var currentFunction functionObject
+	var currentFunction *functionObject
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		fmt.Println("current line:", line)
+		// /fmt.Println("current line:", line)
 
 		switch lineType(line) {
 		case COMMENT:
-			currentFunction = functionObject{}
-			functions = append(functions, &currentFunction)
+			currentFunction = &functionObject{}
+			fmt.Println("making new func")
+
+			functions = append(functions, currentFunction)
 
 			currentFunction.Comment += line + "\n"
 
 			for !strings.Contains(line, "*/") {
-				fmt.Println("current line:", line)
+				//fmt.Println("current line:", line)
 
 				scanner.Scan()
 				line = scanner.Text()
@@ -108,22 +119,39 @@ func parseFile(file fs.FileInfo) []*functionObject {
 			}
 
 		case FUNC:
-			currentFunction.Name = strings.Split(line, " ")[1]
-			currentFunction.Args = strings.Split(strings.Split(line, " ")[2], ",")
+			line = scanner.Text()
+			funcHeader := strings.Split(line[:strings.Index(line, "(")], " ")
+			name := funcHeader[len(funcHeader)-1]
+
+			currentFunction.Name = name
+			if isRestful(currentFunction.Name) {
+				// set currentFunction.Rest to correct type
+			}
+			args := line[strings.Index(line, "(")+1 : strings.Index(line, ")")]
+			fmt.Println(name)
+			fmt.Println(args)
+			currentFunction.Args = strings.Split(args, ", ")
 			for line != "}" {
-				fmt.Println("current line:", line)
+				//fmt.Println("current line:", line)
 
 				scanner.Scan()
 				line = scanner.Text()
 
-				if strings.Contains(line, "query") {
+				if strings.Contains(line, "query =") {
+					fmt.Println("has uery = ", line)
 					currentFunction.Query = line
+					for !strings.Contains(line, "\";") {
+						scanner.Scan()
+						line = scanner.Text()
+						currentFunction.Query += line
+					}
+
 				} else {
 					currentFunction.Contents = append(currentFunction.Contents, line)
 				}
 			}
 
-			fmt.Println("CUR FUNC: ", currentFunction)
+			//fmt.Println("CUR FUNC: ", currentFunction)
 		}
 	}
 
@@ -144,6 +172,7 @@ func main() {
 				os.Exit(1)
 			}
 			fmt.Println(string(e))
+			//fmt.Println(fun)
 		}
 	}
 }
